@@ -125,6 +125,26 @@ class Snaptel(object):
             time.sleep(5)
         return False
 
+    def load_streaming_plugin(self, plugin, plugin_address):
+        print("Loading plugin {} from {}".format(plugin, plugin_address))
+        curr_num_plugin = len(self.get_loaded_plugins())
+        retries = 20
+        while retries > 0:
+            out, err = self._run_command(
+                ["snaptel", "plugin", "load", plugin_address])
+            if err is not None:
+                print("Unable to load plugin {} from {}, error: {}".format(plugin, plugin_address, err))
+                retries -= 1
+            else:
+                self.wait_until_plugin_loaded(plugin, curr_num_plugin)
+                print("Plugin " + plugin_address + " loaded successfully")
+                return True
+            print("Retrying in 5 seconds")
+            time.sleep(5)
+        return False
+
+
+
     def run_task(self, task_path):
         print("Running task " + task_path)
         out, err = self._run_command(
@@ -211,6 +231,11 @@ def main():
     plugin_path_list = download_urls(plugin_list.values(), plugins_directory)
     task_list = j["tasks"]
     task_path_list = download_urls(task_list, tasks_directory)
+
+    streaming_plugins = j["streamingPlugins"]
+    streaming_task_list = j["streamingTasks"]
+    streaming_task_path_list = download_urls(streaming_task_list, tasks_directory)
+
     for task in task_path_list:
         with open(task, "r") as f:
             # Double curly braces appears in json too often,
@@ -220,22 +245,29 @@ def main():
                                 variable_end_string="=>")
             with open(task, "w") as f:
                 f.write(template.render(**os.environ))
+        # Comment the following code because we don't have a shared influxdb now (20171011)
         # Load Data from JSON file
         # Configure Influxdb
-        with open(task, "r") as f:
-            j = json.load(f)
-            if 'workflow' in j and 'collect'in j['workflow']:
-                if 'publish' in j['workflow']['collect']:
-                    create_publish_influxdb(
-                        j['workflow']['collect']['publish'])
-                if 'process' in j['workflow']['collect']:
-                    if 'publish' in j['workflow']['collect']['process']:
-                        create_publish_influxdb(
-                            j['workflow']['collect']['process']['publish'])
+        #with open(task, "r") as f:
+        #    j = json.load(f)
+        #    if 'workflow' in j and 'collect'in j['workflow']:
+        #        if 'publish' in j['workflow']['collect']:
+        #            create_publish_influxdb(
+        #                j['workflow']['collect']['publish'])
+        #        if 'process' in j['workflow']['collect']:
+        #            if 'publish' in j['workflow']['collect']['process']:
+        #                create_publish_influxdb(
+        #                    j['workflow']['collect']['process']['publish'])
 
     print("Snap plugins and tasks prepared")
 
-    print("Loading plugins...", plugin_list)
+    print("Loading plugins...\n{}\n{}".format(plugin_list, streaming_plugins))
+    for plugin, plugin_address in streaming_plugins.items():
+        success = snaptel.load_streaming_plugin(plugin, plugin_address)
+        if not success:
+            print("Timeout when loading streaming plugins")
+            sys.exit(1)
+
     for plugin, plugin_path in zip(plugin_list, plugin_path_list):
         success = snaptel.load_plugin(plugin, plugin_path)
         if not success:
@@ -243,8 +275,8 @@ def main():
             sys.exit(1)
     print("Plugins are loaded\n")
 
-    print("Creating tasks...", task_path_list)
-    for task_path in task_path_list:
+    print("Creating tasks...", task_path_list + streaming_task_path_list)
+    for task_path in (task_path_list + streaming_task_path_list):
         success = snaptel.run_task(task_path)
         if not success:
             sys.exit(1)
