@@ -9,6 +9,9 @@
   "tasks": [
     "http://hyperpilot-snap-config.s3.amazonaws.com/snap-intel.json"
   ],
+  "configs":{
+      "snap-plugin-collector-prometheus": "http://test.blah/config"
+  },
   "pluginsPath": "/opt/snap/plugins",
   "tasksPath": "/opt/snap/tasks"
 }

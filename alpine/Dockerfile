@@ -26,8 +26,12 @@ COPY run.sh /usr/local/bin/run.sh
 COPY snap_init.py snap_init.py
 COPY requirements.txt requirements.txt
 
-RUN apk add --update curl py-psutil jq python python-dev py-pip build-base && \
-    rm -rf /var/cache/apk/* && \
-    pip install -r requirements.txt && mkdir -p /usr/host
+RUN apk add --update curl py-psutil jq python python-dev py-pip build-base linux-headers && \
+    rm -rf /var/cache/apk/*
+RUN pip install --upgrade pip
+RUN pip install -r requirements.txt && mkdir -p /usr/host
+
+RUN mkdir /etc/snap-plugin
+RUN chmod -R 755 /etc/snap-plugin
 
 ENTRYPOINT ["/usr/local/bin/run.sh"]

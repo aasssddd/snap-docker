@@ -58,8 +58,9 @@ def get_deployment_id():
         if len(nodes.items) > 0:
             return nodes.items[0].metadata.labels.get("hyperpilot/deployment", "")
     except config.ConfigException:
-        print "Failed to load configuration. This container cannot run outside k8s."
-        sys.exit(errno.EPERM)
+        print "Failed to load deployment_id. This container should run inside k8s."
+        return ""
+        # sys.exit(errno.EPERM)
 
 
 class Snaptel(object):
@@ -187,6 +188,7 @@ def main():
     config_path = opts.config
     if "://" in opts.config:
         config_path = download_urls([opts.config])[0]
+        print "config_path: {}".format(config_path)
 
     os.environ["DEPLOYMENT_ID"] = get_deployment_id()
 
@@ -211,6 +213,15 @@ def main():
     plugin_path_list = download_urls(plugin_list.values(), plugins_directory)
     task_list = j["tasks"]
     task_path_list = download_urls(task_list, tasks_directory)
+
+    # download config files
+    config_list = j["configs"]
+    for key, value in config_list.items():
+        config_directory = "/etc/snap-plugin/{}".format(key)
+        if not os.path.exists(config_directory):
+            os.makedirs(config_directory)
+        download_urls([value], "/etc/snap-plugin/{}".format(config_directory))
+
     for task in task_path_list:
         with open(task, "r") as f:
             # Double curly braces appears in json too often,
